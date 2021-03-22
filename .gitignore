@@ -1,0 +1,21 @@
+#ignore all folders that start with period
+.*/
+!.mvn/
+.buildpath
+.checkstyle
+.classpath
+.flattened-pom.xml
+.project
+.mvn/wrapper/maven-wrapper.jar
+*~
+*.log
+*.lck
+*.iml
+*.patch
+*.DS_Store
+log.path_IS_UNDEFINED
+target/
+.DS_STORE
+dependency-reduced-pom.xml
+.externalToolBuilders*
+.indexing

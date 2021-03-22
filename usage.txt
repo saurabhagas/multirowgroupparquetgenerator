@@ -1,0 +1,32 @@
+Example:
+java -cp multirowgroupparquetgenerator-1.0-SNAPSHOT-jar-with-dependencies.jar com.dremio.multirowgroupparquetgenerator.Main
+ -columns 300 -types "int,bigint,string" -cellsize 100 -rows 1000 -nullpercent 10 -blocksize 256000000 -pagesize 64000000 -path "/tmp/output4.parquet"
+
+Options:
+
+-columns: Number of columns in the table. Column names will be 'f0', 'f1', 'f2', etc,. All columns are string type.
+Default: 50
+
+-types: Comma separated column data types in order. If specified types are less than total columns, remaining columns use last specified type
+Default: string
+
+-cellsize: String value length per cell. All values will be of same length and string are random strings.
+Default: 10
+
+-rows: Total number of rows in generated parquet file
+Default: 100000
+
+-nullpercent: Approximate percentage of null values in the data. 100% is all nulls and 0% is no nulls.
+Default: 10
+
+-blocksize: This is the size of the row group. So, if columns * cellsize exceeds block size, a new row group gets added
+Default: 32768
+
+-pagesize: This is the page size inside a row group
+Default: 4096
+
+-path: output file path
+Default: /tmp/output.parquet
+
+
+
