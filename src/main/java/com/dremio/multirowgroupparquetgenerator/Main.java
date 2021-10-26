@@ -22,6 +22,7 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 
 public class Main {
+
   private static final int columnCount = 50;
   private static final int columnStringDataLength = 10;
   private static final int totalRows = 100000;
@@ -29,6 +30,7 @@ public class Main {
   private static final int pageSize = 4 * 1024;
   private static final String filePath = "/tmp/output.parquet";
   private static final String datatypes = "string";
+  private static final String compressionCodec = "snappy";
   private static final int nullPercent = 10;
   private static int temp = 0;
 
@@ -42,6 +44,7 @@ public class Main {
     int page = cliArgs.switchIntValue("-pagesize", pageSize);
     String file = cliArgs.switchValue("-path", filePath);
     String types = cliArgs.switchValue("-types", datatypes);
+    String compressionType = cliArgs.switchValue("-compresssion", compressionCodec);
     int nulls = cliArgs.switchIntValue("-nullpercent", nullPercent);
     if (nulls < 0 || nulls > 100) {
       nulls = nullPercent;
@@ -52,40 +55,41 @@ public class Main {
     }
 
     System.out.println("-columns " + columns +
-      " -types " + types +
-      " -cellsize " + stringDataLength +
-      " -rows " +
-      +rows + " -blocksize " +
-      block + " -pagesize " +
-      page + " -path " +
-      file);
+        " -types " + types +
+        " -cellsize " + stringDataLength +
+        " -rows " +
+        +rows + " -blocksize " +
+        block + " -pagesize " +
+        page + " -path " +
+        file);
     Schema schema = getFileSchema(columns, typeArr);
     writeToParquet(schema, columns, typeArr,
-      stringDataLength, rows, block, page, nulls, file);
+        stringDataLength, rows, block, page, nulls, file, compressionCodec);
   }
 
   private static void writeToParquet(Schema schema,
-                                     int columns,
-                                     String[] typeArr,
-                                     int stringDataLength,
-                                     int rows,
-                                     int block,
-                                     int page,
-                                     int nullPercentage,
-                                     String file) {
+      int columns,
+      String[] typeArr,
+      int stringDataLength,
+      int rows,
+      int block,
+      int page,
+      int nullPercentage,
+      String file,
+      String compressionCodec) {
     Path path = new Path(file);
     ParquetWriter<GenericData.Record> writer = null;
     try {
       writer = AvroParquetWriter.
-        <GenericData.Record>builder(path)
-        .withRowGroupSize(block)
-        .withPageSize(page)
-        .withSchema(schema)
-        .withConf(new Configuration())
-        .withCompressionCodec(CompressionCodecName.SNAPPY)
-        .withValidation(false)
-        .withDictionaryEncoding(false)
-        .build();
+          <GenericData.Record>builder(path)
+          .withRowGroupSize(block)
+          .withPageSize(page)
+          .withSchema(schema)
+          .withConf(new Configuration())
+          .withCompressionCodec(getCompressionCodec(compressionCodec))
+          .withValidation(false)
+          .withDictionaryEncoding(false)
+          .build();
 
       for (int row = 0; row < rows; ++row) {
         GenericData.Record record = new GenericData.Record(schema);
@@ -745,6 +749,31 @@ public class Main {
     }
   }
 
+  private static CompressionCodecName getCompressionCodec(String compressionCodec) {
+    if (compressionCodec.equalsIgnoreCase("zstd")) {
+      return CompressionCodecName.ZSTD;
+    }
+
+    if (compressionCodec.equalsIgnoreCase("gzip")) {
+      return CompressionCodecName.GZIP;
+    }
+
+    if(compressionCodec.equalsIgnoreCase("uncompressed")){
+      return CompressionCodecName.UNCOMPRESSED;
+    }
+
+    if(compressionCodec.equalsIgnoreCase("lz4")){
+      return CompressionCodecName.LZ4;
+    }
+
+    if(compressionCodec.equalsIgnoreCase("snappy")){
+      return CompressionCodecName.SNAPPY;
+    }
+
+    System.out.println("The -compression option was not defined, using Snappy as default");
+    return CompressionCodecName.SNAPPY;
+  }
+
   private static Schema getFileSchema(int columns, String[] typeArr) {
     SchemaBuilder.RecordBuilder<Schema> schemaRecordBuilder = SchemaBuilder.record("heythere");
     SchemaBuilder.FieldAssembler<Schema> schemaFieldAssembler = schemaRecordBuilder.fields();
@@ -770,7 +799,8 @@ public class Main {
           schemaFieldAssembler = schemaFieldAssembler.optionalLong("f" + i);
           break;
         case "DECIMAL": {
-          Schema decimalType = LogicalTypes.decimal(10, 5).addToSchema(Schema.create(Schema.Type.BYTES));
+          Schema decimalType = LogicalTypes.decimal(10, 5)
+              .addToSchema(Schema.create(Schema.Type.BYTES));
           schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type(decimalType).noDefault();
           break;
         }
@@ -780,238 +810,246 @@ public class Main {
           break;
         }
         case "TIMESTAMP": {
-          Schema timestampType = LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG));
+          Schema timestampType = LogicalTypes.timestampMillis()
+              .addToSchema(Schema.create(Schema.Type.LONG));
           schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type(timestampType).noDefault();
           break;
         }
         case "ARRAY": {
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().array().items().record("test").fields().requiredInt("element").endRecord().noDefault();
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().optional().array().items().record("test").fields().optionalInt("element").endRecord();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().array().items()
+              .record("test").fields().requiredInt("element").endRecord().noDefault();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().optional().array()
+              .items().record("test").fields().optionalInt("element").endRecord();
           break;
         }
         case "NULLABLEARRAY": {
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().optional().array().items().record("test").fields().requiredInt("element").endRecord();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().optional().array()
+              .items().record("test").fields().requiredInt("element").endRecord();
           break;
         }
         case "ARRAY_NULLABLE": {
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().array().items().record("test").fields().optionalInt("element").endRecord().noDefault();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().array().items()
+              .record("test").fields().optionalInt("element").endRecord().noDefault();
           break;
         }
         case "STRUCT": {
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().record("test").fields().requiredInt("field").endRecord().noDefault();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().record("test").fields()
+              .requiredInt("field").endRecord().noDefault();
           break;
         }
         case "NULLABLESTRUCT": {
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().optional().record("test").fields().requiredInt("field").endRecord();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().optional().record("test")
+              .fields().requiredInt("field").endRecord();
           break;
         }
         case "STRUCT_NULLABLE": {
-          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().record("test").fields().optionalInt("field").endRecord().noDefault();
+          schemaFieldAssembler = schemaFieldAssembler.name("f" + i).type().record("test").fields()
+              .optionalInt("field").endRecord().noDefault();
           break;
         }
         case "ARRAY_STRUCT": {
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .record("struct")
-            .fields()
-            .requiredInt("field")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .record("struct")
+              .fields()
+              .requiredInt("field")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault();
           break;
         }
         case "STRUCT_ARRAY":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .record("test")
-            .fields()
-            .name("field")
-            .type()
-            .array()
-            .items()
-            .record("test2")
-            .fields()
-            .requiredInt("element")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .record("test")
+              .fields()
+              .name("field")
+              .type()
+              .array()
+              .items()
+              .record("test2")
+              .fields()
+              .requiredInt("element")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault();
 
           break;
         case "ARRAY_STRUCT_STRUCT":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .record("struct1")
-            .fields()
-            .name("element2")
-            .type()
-            .record("struct2")
-            .fields()
-            .requiredInt("field")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .record("struct1")
+              .fields()
+              .name("element2")
+              .type()
+              .record("struct2")
+              .fields()
+              .requiredInt("field")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault();
           break;
         case "ARRAY_STRUCT_NULLSTRUCT_STRUCT":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .record("struct1")
-            .fields()
-            .name("element2")
-            .type()
-            .optional()
-            .record("struct2")
-            .fields()
-            .name("element3")
-            .type()
-            .record("struct3")
-            .fields()
-            .requiredInt("field")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .record("struct1")
+              .fields()
+              .name("element2")
+              .type()
+              .optional()
+              .record("struct2")
+              .fields()
+              .name("element3")
+              .type()
+              .record("struct3")
+              .fields()
+              .requiredInt("field")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault();
           break;
         case "ARRAY_NULLARRAY_ARRAY":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .optional()
-            .array()
-            .items()
-            .record("test2")
-            .fields()
-            .name("element")
-            .type()
-            .array()
-            .items()
-            .record("test4")
-            .fields()
-            .requiredInt("element")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .optional()
+              .array()
+              .items()
+              .record("test2")
+              .fields()
+              .name("element")
+              .type()
+              .array()
+              .items()
+              .record("test4")
+              .fields()
+              .requiredInt("element")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .endRecord()
+              .noDefault();
           break;
         case "MAP":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .map()
-            .values(Schema.create(Schema.Type.INT))
-            .noDefault();
+              .type()
+              .map()
+              .values(Schema.create(Schema.Type.INT))
+              .noDefault();
           break;
         case "MAP_NULLABLEVAL":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .map()
-            .values()
-            .nullable()
-            .intType()
-            .noDefault();
+              .type()
+              .map()
+              .values()
+              .nullable()
+              .intType()
+              .noDefault();
           break;
         case "ARRAY_MAP":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .map()
-            .values(Schema.create(Schema.Type.INT))
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .map()
+              .values(Schema.create(Schema.Type.INT))
+              .noDefault()
+              .endRecord()
+              .noDefault();
           break;
         case "ARRAY_MAP_NULLABLESTRUCT":
           schemaFieldAssembler = schemaFieldAssembler.name("f" + 1)
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .map()
-            .values()
-            .nullable()
-            .record("test2")
-            .fields()
-            .requiredInt("field")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .map()
+              .values()
+              .nullable()
+              .record("test2")
+              .fields()
+              .requiredInt("field")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault();
           break;
         case "LIST_MAP_NULLABLEVAL_LIST_MAP_LIST_STRUCT":
           schemaFieldAssembler = schemaFieldAssembler.name("f1")
-            .type()
-            .array()
-            .items()
-            .record("test")
-            .fields()
-            .name("element")
-            .type()
-            .map()
-            .values()
-            .nullable()
-            .array()
-            .items()
-            .record("test2")
-            .fields()
-            .name("element")
-            .type()
-            .map()
-            .values()
-            .array()
-            .items()
-            .record("test3")
-            .fields()
-            .name("element")
-            .type()
-            .record("test4")
-            .fields()
-            .requiredInt("field")
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault()
-            .endRecord()
-            .noDefault();
+              .type()
+              .array()
+              .items()
+              .record("test")
+              .fields()
+              .name("element")
+              .type()
+              .map()
+              .values()
+              .nullable()
+              .array()
+              .items()
+              .record("test2")
+              .fields()
+              .name("element")
+              .type()
+              .map()
+              .values()
+              .array()
+              .items()
+              .record("test3")
+              .fields()
+              .name("element")
+              .type()
+              .record("test4")
+              .fields()
+              .requiredInt("field")
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault()
+              .endRecord()
+              .noDefault();
           break;
         case "STRING":
         default:
