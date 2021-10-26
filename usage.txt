@@ -16,6 +16,9 @@ Default: 10
 -rows: Total number of rows in generated parquet file
 Default: 100000
 
+-compression: The used codec to compress the parquet data
+Default: snappy
+
 -nullpercent: Approximate percentage of null values in the data. 100% is all nulls and 0% is no nulls.
 Default: 10
 
