@@ -44,6 +44,7 @@ public class Main {
     int page = cliArgs.switchIntValue("-pagesize", pageSize);
     String file = cliArgs.switchValue("-path", filePath);
     String types = cliArgs.switchValue("-types", datatypes);
+    boolean enableDictionary = Boolean.parseBoolean(cliArgs.switchValue("-dictionary", "false"));
     String compressionType = cliArgs.switchValue("-compresssion", compressionCodec);
     int nulls = cliArgs.switchIntValue("-nullpercent", nullPercent);
     if (nulls < 0 || nulls > 100) {
@@ -63,8 +64,8 @@ public class Main {
         page + " -path " +
         file);
     Schema schema = getFileSchema(columns, typeArr);
-    writeToParquet(schema, columns, typeArr,
-        stringDataLength, rows, block, page, nulls, file, compressionCodec);
+    writeToParquet(schema, columns, typeArr, stringDataLength, rows,
+        block, page, nulls, file, compressionType, enableDictionary);
   }
 
   private static void writeToParquet(Schema schema,
@@ -76,7 +77,8 @@ public class Main {
       int page,
       int nullPercentage,
       String file,
-      String compressionCodec) {
+      String compressionCodec,
+      boolean enableDictionaryEncoding) {
     Path path = new Path(file);
     ParquetWriter<GenericData.Record> writer = null;
     try {
@@ -88,7 +90,7 @@ public class Main {
           .withConf(new Configuration())
           .withCompressionCodec(getCompressionCodec(compressionCodec))
           .withValidation(false)
-          .withDictionaryEncoding(false)
+          .withDictionaryEncoding(enableDictionaryEncoding)
           .build();
 
       for (int row = 0; row < rows; ++row) {
@@ -758,15 +760,15 @@ public class Main {
       return CompressionCodecName.GZIP;
     }
 
-    if(compressionCodec.equalsIgnoreCase("uncompressed")){
+    if (compressionCodec.equalsIgnoreCase("uncompressed")) {
       return CompressionCodecName.UNCOMPRESSED;
     }
 
-    if(compressionCodec.equalsIgnoreCase("lz4")){
+    if (compressionCodec.equalsIgnoreCase("lz4")) {
       return CompressionCodecName.LZ4;
     }
 
-    if(compressionCodec.equalsIgnoreCase("snappy")){
+    if (compressionCodec.equalsIgnoreCase("snappy")) {
       return CompressionCodecName.SNAPPY;
     }
 
