@@ -10,7 +10,7 @@
 
   <properties>
     <avro.version>1.10.2</avro.version>
-    <parquet.version>1.11.1</parquet.version>
+    <parquet.version>1.12.1</parquet.version>
     <guava.version>30.1.1-jre</guava.version>
     <commons-lang3.version>3.12.0</commons-lang3.version>
   </properties>
