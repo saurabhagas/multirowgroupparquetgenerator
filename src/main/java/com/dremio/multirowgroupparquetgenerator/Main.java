@@ -59,7 +59,7 @@ public class Main {
         " -types " + types +
         " -cellsize " + stringDataLength +
         " -rows " +
-        +rows + " -blocksize " +
+        rows + " -blocksize " +
         block + " -pagesize " +
         page + " -path " +
         file);
@@ -96,12 +96,7 @@ public class Main {
       for (int row = 0; row < rows; ++row) {
         GenericData.Record record = new GenericData.Record(schema);
         for (int col = 0; col < columns; ++col) {
-          String type;
-          if (col < typeArr.length) {
-            type = typeArr[col];
-          } else {
-            type = typeArr[typeArr.length - 1];
-          }
+          String type = typeArr[col % typeArr.length];
 
           switch (type.toUpperCase()) {
             case "INT":
@@ -159,16 +154,11 @@ public class Main {
                   return null;
                 }
               };
-//                            if (RandomUtils.nextInt() % 3 == 0) {
-//                                record.put(col, Arrays.asList());
-//                            } else {
+
               List<IndexedRecord> list = new ArrayList<>();
               for (int i = 0; i < 1000; ++i) {
                 list.add(struct);
               }
-              record.put(col, list);
-//                                record.put(col, Arrays.asList(struct, struct));
-//                            }
               break;
             case "NULLABLEARRAY": {
               final IndexedRecord struct_na = new IndexedRecord() {
