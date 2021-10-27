@@ -1,8 +1,5 @@
 package com.dremio.multirowgroupparquetgenerator;
 
-import java.io.IOException;
-import java.util.*;
-
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -17,12 +14,19 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 
-import static java.util.Collections.EMPTY_SET;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class Main {
 
     private static final int columnCount = 50;
-    private static final int columnStringDataLength = 10;
+    private static final String columnStringDataLength = "10";
     private static final int totalRows = 100000;
     private static final int blockSize = 32 * 1024;
     private static final int pageSize = 4 * 1024;
@@ -37,7 +41,7 @@ public class Main {
         CliArgs cliArgs = new CliArgs(args);
 
         int columns = cliArgs.switchIntValue("-columns", columnCount);
-        int stringDataLength = cliArgs.switchIntValue("-cellsize", columnStringDataLength);
+        String stringDataLength = cliArgs.switchValue("-cellsize", columnStringDataLength);
         int rows = cliArgs.switchIntValue("-rows", totalRows);
         int block = cliArgs.switchIntValue("-blocksize", blockSize);
         int page = cliArgs.switchIntValue("-pagesize", pageSize);
@@ -59,6 +63,13 @@ public class Main {
             dictColumns = types.split(dictionaries);
         }
 
+        String[] lenghtsForStringColumns = stringDataLength.split(",");
+        if (lenghtsForStringColumns.length == 0) {
+            lenghtsForStringColumns = stringDataLength.split(columnStringDataLength);
+        }
+
+        int[] stringLenAsInt = getStringLenAsIntegers(lenghtsForStringColumns);
+
         System.out.println("-columns " + columns +
                 " -types " + types +
                 " -cellsize " + stringDataLength +
@@ -69,8 +80,17 @@ public class Main {
                 file);
         Schema schema = getFileSchema(columns, typeArr);
         Set<String> columnsWithDictEncoding = getColumnsWithDictEncoding(columns, dictColumns, typeArr);
-        writeToParquet(schema, columns, typeArr, stringDataLength, rows,
+        writeToParquet(schema, columns, typeArr, stringLenAsInt, rows,
                 block, page, nulls, file, compressionType, columnsWithDictEncoding);
+    }
+
+    private static int[] getStringLenAsIntegers(String[] lenghtsForStringColumns) {
+        int[] lengthsAsInt = new int[lenghtsForStringColumns.length];
+        for (int i = 0; i < lenghtsForStringColumns.length; i++) {
+            lengthsAsInt[i] = Integer.parseInt(lenghtsForStringColumns[i]);
+        }
+
+        return lengthsAsInt;
     }
 
     private static Set<String> getColumnsWithDictEncoding(int columns, String[] dictColumns, String[] typeArr) {
@@ -96,7 +116,7 @@ public class Main {
     private static void writeToParquet(Schema schema,
                                        int columns,
                                        String[] typeArr,
-                                       int stringDataLength,
+                                       int[] stringDataLengthArr,
                                        int rows,
                                        int block,
                                        int page,
@@ -119,6 +139,8 @@ public class Main {
             enableDictionaryEncodingForIndividualColumns(recordBuilder, columnsWithDictEncoding, columns);
 
             writer = recordBuilder.build();
+
+            int strPosition = 0;
 
             for (int row = 0; row < rows; ++row) {
                 GenericData.Record record = new GenericData.Record(schema);
@@ -748,8 +770,9 @@ public class Main {
                             }
                             break;
                         case "STRING":
+                            int stringLen = stringDataLengthArr[strPosition++ % stringDataLengthArr.length];
                             if (RandomUtils.nextInt() % 100 >= nullPercentage) {
-                                record.put(col, RandomStringUtils.randomAlphanumeric(stringDataLength));
+                                record.put(col, RandomStringUtils.randomAlphanumeric(stringLen));
                             } else {
                                 record.put(col, null);
                             }
@@ -1036,7 +1059,7 @@ public class Main {
                             .noDefault();
                     break;
                 case "LIST_MAP_NULLABLEVAL_LIST_MAP_LIST_STRUCT":
-                    schemaFieldAssembler = schemaFieldAssembler.name("f1")
+                    schemaFieldAssembler = schemaFieldAssembler.name("f" + i)
                             .type()
                             .array()
                             .items()
